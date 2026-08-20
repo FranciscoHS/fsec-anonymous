@@ -594,7 +594,9 @@ def render(columns_data, png_path, pdf_path,
             ref_y: float | None = 2.0,
             ref_label: str = r"$p=2$ (Euclidean)",
             ylim: tuple[float, float] | None = None,
-            fontscale: float = 1.0):
+            fontscale: float = 1.0,
+            divider_before: set[str] | None = None,
+            col_colors: dict[str, str] | None = None):
     """columns_data is a list of (column_label, sub_label_to_values_dict).
 
     Within each column, all sub-groups share the same x position; they're
@@ -608,6 +610,11 @@ def render(columns_data, png_path, pdf_path,
     the column label alone identifies the data).
     ``show_stats_text``: when True, prints "μ=X.XX  Md=Y.YY" above each
     column near the top of the panel.
+    ``divider_before``: column labels that get a dashed vertical separator
+    (plus extra horizontal gap) drawn before them — used to set controls
+    apart from the main families.
+    ``col_colors``: per-column color override (applies to every sub-group
+    in that column); columns not listed keep the default palette.
     """
     # palette for sub-groups (max 6); cycles if needed.
     SUB_COLORS = ["#3a6ea5", "#D9822B", "#3aa54a", "#a53a3a",
@@ -627,6 +634,11 @@ def render(columns_data, png_path, pdf_path,
     label_y_legend = -0.33
 
     for col_label, subs in columns_data:
+        if divider_before and col_label in divider_before:
+            x_pos += 0.35
+            ax.axvline(x_pos - 0.68, color="#bbbbbb", lw=1.2,
+                       ls=(0, (4, 3)), zorder=1)
+        col_color = (col_colors or {}).get(col_label)
         sub_labels = list(subs)
         # Pooled stats kept around for the per-column stats text line
         # (when show_stats_text=True). The diamonds and median bars
@@ -654,7 +666,7 @@ def render(columns_data, png_path, pdf_path,
         for s_idx, sub in enumerate(sub_labels):
             data = np.array(list(subs[sub].values()))
             if not len(data): continue
-            color = SUB_COLORS[s_idx % len(SUB_COLORS)]
+            color = col_color or SUB_COLORS[s_idx % len(SUB_COLORS)]
             m_s, lo_s, hi_s = _bootstrap_pooled_mean_ci({sub: subs[sub]})
             x_s = x_pos + offsets[s_idx]
             if np.isfinite(m_s):
@@ -673,7 +685,7 @@ def render(columns_data, png_path, pdf_path,
             data = np.array(list(subs[sub].values()))
             if not len(data): continue
             xs = x_pos + rng.uniform(-0.30, 0.30, size=len(data))
-            color = SUB_COLORS[s_idx % len(SUB_COLORS)]
+            color = col_color or SUB_COLORS[s_idx % len(SUB_COLORS)]
             ax.scatter(xs, data, color=color, s=26, alpha=0.30,
                        edgecolor="none", zorder=3, label=sub)
         # Per-column legend (small, just below the column label).
@@ -690,12 +702,16 @@ def render(columns_data, png_path, pdf_path,
             # Two-line treatment: family name (larger, semibold) on top,
             # mean + 95% CI underneath in smaller font. Median stays as
             # the black bar inside the panel.
-            ax.text(x_pos, label_y_main, _wrap_label(col_label),
+            wrapped = _wrap_label(col_label)
+            ax.text(x_pos, label_y_main, wrapped,
                     ha="center", va="top",
                     transform=ax.get_xaxis_transform(),
                     fontsize=19 * fontscale, fontweight="semibold",
                     linespacing=1.05, color="#222")
-            ax.text(x_pos, label_y_main - 0.155,
+            # Wrapped (two-line) labels need the stats block pushed down
+            # one extra line so the texts don't overlap.
+            stats_dy = 0.155 + (0.145 if "\n" in wrapped else 0.0)
+            ax.text(x_pos, label_y_main - stats_dy,
                     f"mean {mean:.2f}\n[{lo:.2f}, {hi:.2f}]",
                     ha="center", va="top",
                     transform=ax.get_xaxis_transform(),

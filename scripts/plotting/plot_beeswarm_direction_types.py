@@ -168,6 +168,35 @@ def main():
             print(f"  {label:<12s} n={len(fits)}  (no overlap filter)")
         columns.append((label, {label: fits}))
 
+    # Shuffled-weights control: same pipeline run end-to-end on Gemma with
+    # every 2D block weight matrix permuted within-matrix (5 permutation
+    # seeds x tier-1 pairs; scripts/shuffled_weights_baseline.py). Rules
+    # out the perturbation/readout machinery itself as a source of p > 2.
+    # Pairs are pooled across seeds; keys get a per-seed tag so identical
+    # pair names from different seeds don't collide. Per-seed overlap
+    # filter applied against that seed's own (shuffled-model) directions.
+    shuf = {}
+    n_shuf_seeds = 0
+    for k in range(10):
+        fp = os.path.join(FITS_DIR,
+                          f"fits_{args.target}_L{args.layer}_shufseed{k}{thr}.pkl")
+        fits = _load_fit_pair_dict(fp)
+        if not fits:
+            continue
+        n_shuf_seeds += 1
+        n_before = len(fits)
+        fits = _filter_family_overlap(fits, args.target, args.layer,
+                                      f"_shufseed{k}", args.max_overlap)
+        print(f"  shufseed{k}: n={len(fits)}/{n_before} (|cos| <= "
+              f"{args.max_overlap})")
+        for pair, p in fits.items():
+            shuf[frozenset({f"{n}#s{k}" for n in pair})] = p
+    if shuf:
+        label = "Shuffled weights"
+        print(f"  {label:<12s} n={len(shuf)} pooled over "
+              f"{n_shuf_seeds} permutation seeds")
+        columns.append((label, {label: shuf}))
+
     if not columns:
         print("no data"); return
 
@@ -184,7 +213,9 @@ def main():
         f"{overlap_tag}{excl_tag}_dirfamilies_morebaselines.png")
     out_pdf = out_png.replace(".png", ".pdf")
     render(columns, out_png, out_pdf, show_sub_legends=False,
-           show_stats_text=True, fontscale=1.4, ylim=(1.0, 4.0))
+           show_stats_text=True, fontscale=1.4, ylim=(1.0, 4.0),
+           divider_before={"Shuffled weights"},
+           col_colors={"Shuffled weights": "#8a8a8a"})
 
 
 if __name__ == "__main__":
