@@ -843,15 +843,15 @@ def main():
     if "model" in args.columns:
         _add("Model", col_model(args.layer, max_overlap=mo))
     if "perturb" in args.columns:
-        _add("Perturbation layer", col_perturb_layer(args.target, max_overlap=mo))
+        _add("Perturb. layer", col_perturb_layer(args.target, max_overlap=mo))
     if "measure" in args.columns:
-        _add("Measurement layer", col_measure_layer(args.target, args.layer, max_overlap=mo))
+        _add("Measure layer", col_measure_layer(args.target, args.layer, max_overlap=mo))
     if "metric" in args.columns:
         _add("Fit metric", col_metric(args.target, args.layer, max_overlap=mo))
     if "threshold" in args.columns:
         _add("Response threshold", col_threshold(args.target, args.layer, max_overlap=mo))
     if "method" in args.columns:
-        _add("Perturbation method", col_method(args.target, args.layer, max_overlap=mo))
+        _add("Perturb. method", col_method(args.target, args.layer, max_overlap=mo))
     if "direction" in args.columns:
         _add("Direction family", col_direction_type(args.target, args.layer, max_overlap=mo))
     if "anchor_source" in args.columns:
@@ -902,7 +902,7 @@ def main():
         f"{overlap_tag}{excl_tag}{cols_tag}.png")
     out_pdf = out_png.replace(".png", ".pdf")
     render(columns, out_png, out_pdf,
-           show_stats_text=args.show_stats_text)
+           show_stats_text=args.show_stats_text, fontscale=1.3)
 
 
 if __name__ == "__main__":
