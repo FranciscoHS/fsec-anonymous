@@ -89,8 +89,8 @@ def main():
         return np.cos(np.radians(deg))
 
     secax = ax.secondary_xaxis("top", functions=(_cos_to_deg, _deg_to_cos))
-    secax.set_xlabel(r"misalignment angle $\alpha$ (deg)")
-    secax.set_xticks([15, 30, 45, 60, 75, 90])
+    secax.set_xlabel(r"misalignment angle $\theta$ (deg)")
+    secax.set_xticks([0, 30, 45, 60, 75, 90])
 
     fig.tight_layout()
     fig.savefig(args.out, dpi=150, bbox_inches="tight")
