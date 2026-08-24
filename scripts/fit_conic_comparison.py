@@ -49,6 +49,7 @@ FAMILIES = [
     ("SAE",         "_fineweb_60deg_dirsae_fineweb.pkl",     "_sae_fineweb"),
     ("PCA",         "_fineweb_60deg_dirpca_fineweb.pkl",     "_pca_fineweb"),
     ("Random",      "_fineweb_60deg_dirrandom.pkl",          "_random"),
+    ("Random-diff", "_fineweb_60deg_dirrandomdiffavg_fineweb.pkl", "_randomdiffavg_fineweb"),
 ]
 
 

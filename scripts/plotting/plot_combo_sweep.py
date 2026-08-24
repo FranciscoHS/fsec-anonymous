@@ -91,6 +91,32 @@ def paired_vs_random(feat, rand_ref, xs, max_angle, n_boot=10_000, seed=0):
     }
 
 
+def ray_curve(grid, angles, w1, w2, r_vals):
+    """Per-anchor combo curve along an arbitrary mixing ray.
+
+    grid: (n_anchors, n, n) of L^2 on the (alpha_1, alpha_2) lattice
+    `angles` x `angles` (deg). The geodesic perturbation toward unit
+    direction (w1*d1_perp + w2*d2_perp)/||.|| at radius r places its
+    grid coordinates at (alpha_1, alpha_2) = (r*w1, r*w2) (see
+    parametrize.exp_map_2d, where the tangent is alpha_1*d1p + alpha_2*d2p
+    and the geodesic angle is sqrt(alpha_1^2 + alpha_2^2)). Bilinearly
+    interpolates the grid along that ray for each radius in `r_vals`.
+    Returns (n_anchors, len(r_vals)).
+    """
+    nrm = np.hypot(w1, w2)
+    u1, u2 = w1 / nrm, w2 / nrm
+    a1 = np.clip(r_vals * u1, angles[0], angles[-1])
+    a2 = np.clip(r_vals * u2, angles[0], angles[-1])
+    i = np.clip(np.searchsorted(angles, a1, side="right") - 1, 0, len(angles) - 2)
+    j = np.clip(np.searchsorted(angles, a2, side="right") - 1, 0, len(angles) - 2)
+    fi = (a1 - angles[i]) / (angles[i + 1] - angles[i])
+    fj = (a2 - angles[j]) / (angles[j + 1] - angles[j])
+    g00, g10 = grid[:, i, j], grid[:, i + 1, j]
+    g01, g11 = grid[:, i, j + 1], grid[:, i + 1, j + 1]
+    return ((1 - fi) * (1 - fj) * g00 + fi * (1 - fj) * g10
+            + (1 - fi) * fj * g01 + fi * fj * g11)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", default="gemma")
@@ -117,6 +143,12 @@ def main():
                          "(median + IQR across the per-direction "
                          "anchor-medians). 0 disables the random "
                          "baseline.")
+    ap.add_argument("--mix", default=None,
+                    help="combination weights 'w1,w2' for the green combo "
+                         "curve (w1 on --d1, w2 on --d2). The direction is "
+                         "normalized to unit length, so '0.8,0.2' and "
+                         "'4,1' give the same ray. Default (omitted) is the "
+                         "equal-weight diagonal of the original figure.")
     ap.add_argument("--out_tag", default="")
     args = ap.parse_args()
 
@@ -149,9 +181,21 @@ def main():
         gender_axis_grid = grid[:, 0, :]
         tense_axis_grid  = grid[:, :, 0]
 
-    # equal-weight combination: l2 along (d1_perp + d2_perp)/sqrt(2)
-    diag = np.stack([grid[:, k, k] for k in range(len(angles))], axis=1)
-    diag_x = np.sqrt(2.0) * angles                       # geodesic radius
+    # combination curve: l2 along (w1*d1_perp + w2*d2_perp)/||.||.
+    if args.mix is None:
+        # equal-weight combination: l2 along (d1_perp + d2_perp)/sqrt(2)
+        diag = np.stack([grid[:, k, k] for k in range(len(angles))], axis=1)
+        diag_x = np.sqrt(2.0) * angles
+        combo_label = f"{args.d1} + {args.d2}"
+    else:
+        w1, w2 = (float(x) for x in args.mix.split(","))
+        # geodesic radius grid; r*u1, r*u2 stay within [0, angles.max()]
+        # for any normalized (u1, u2), so the ray never leaves the lattice.
+        diag_x = np.linspace(0.0, float(angles.max()), 4 * len(angles))
+        diag = ray_curve(grid, angles, w1, w2, diag_x)
+        combo_label = f"{w1:g}·{args.d1} + {w2:g}·{args.d2}"
+        print(f"combo mix: {w1:g}*{args.d1} + {w2:g}*{args.d2} "
+              f"(normalized direction, unit length)")                       # geodesic radius
 
     median_grid_full = np.median(grid, axis=0)
     base = float(min(median_grid_full[:, 0].max(),
@@ -245,7 +289,7 @@ def main():
         cases = [
             (args.d1, gender_axis_grid, rand_anchor_ref, angles),
             (args.d2, tense_axis_grid, rand_anchor_ref, angles),
-            (f"{args.d1}+{args.d2}", diag[:, c_ok], combo_ref, diag_x[c_ok]),
+            (combo_label, diag[:, c_ok], combo_ref, diag_x[c_ok]),
         ]
         n_dirs = len(rand_per_dir)
         print(f"\npaired per-anchor stats vs random reference "
@@ -282,8 +326,7 @@ def main():
 
     _plot(angles, g_med, g_lo, g_hi, C_D1, args.d1)
     _plot(angles, t_med, t_lo, t_hi, C_D2, args.d2)
-    _plot(diag_x, c_med, c_lo, c_hi, C_CB,
-          f"{args.d1} + {args.d2}")
+    _plot(diag_x, c_med, c_lo, c_hi, C_CB, combo_label)
     if rand_curve is not None:
         r_med, r_lo, r_hi, _n_dirs = rand_curve
         _plot(angles, r_med, r_lo, r_hi, C_RD,
@@ -311,12 +354,13 @@ def main():
                                           else 0.0]))]
     ax.set_ylim(0, max(y_top_candidates) * 1.05)
 
-    ax.set_xlabel(r"Perturbation angle $\alpha$ (deg)", fontsize=13)
-    ax.set_ylabel(r"$L^2$ distance at penultimate layer", fontsize=13)
+    ax.set_xlabel(r"Perturbation angle $\alpha$ (deg)", fontsize=17)
+    ax.set_ylabel(r"$L^2$ distance at penultimate layer", fontsize=17)
+    ax.tick_params(labelsize=14)
     ax.grid(alpha=0.2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.legend(frameon=True, fontsize=10, loc="upper left")
+    ax.legend(frameon=True, fontsize=13, loc="upper left")
 
     plt.tight_layout()
     os.makedirs(OUT_DIR, exist_ok=True)
