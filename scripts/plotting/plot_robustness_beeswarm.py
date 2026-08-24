@@ -645,7 +645,7 @@ def render(columns_data, png_path, pdf_path,
 
     x_pos = 1.0
     label_y_main = -0.04
-    label_y_legend = -0.33
+    label_y_legend = -0.33 * fontscale
 
     for col_label, subs in columns_data:
         if divider_before and col_label in divider_before:

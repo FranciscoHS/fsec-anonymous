@@ -116,6 +116,10 @@ def main():
     ]
     cols = [(label, _apply_filters(d, target, layer, mo, excl))
             for label, d in cols]
+    # Wrap the one over-long legend entry so it stays inside its column.
+    cols = [(label, {("norm-\nmatched" if s == "norm-matched" else s): v
+                     for s, v in subs.items()})
+            for label, subs in cols]
 
     # Direction family column: same logic as plot_beeswarm_direction_types
     # but rolled into one column with multiple sub-groups (one per family),
