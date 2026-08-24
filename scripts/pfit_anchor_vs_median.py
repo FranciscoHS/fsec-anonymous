@@ -1,4 +1,4 @@
-"""Methodology check (Stefan): does fitting the superellipse exponent p
+"""Methodology check: does fitting the superellipse exponent p
 PER ANCHOR and then aggregating give tighter error bars than the current
 "fit once on the median-over-anchors grid" procedure?
 

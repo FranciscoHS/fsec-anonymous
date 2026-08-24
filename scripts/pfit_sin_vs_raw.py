@@ -1,4 +1,4 @@
-"""Methodology check (Stefan): does the superellipse fit better in
+"""Methodology check: does the superellipse fit better in
 sin(alpha) coordinates (exact geodesic, current) or in raw-alpha
 coordinates (small-angle)? Compares the fit residual (mean radial
 fraction) per pair on the median-over-anchors grid.
