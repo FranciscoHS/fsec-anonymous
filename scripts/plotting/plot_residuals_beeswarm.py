@@ -86,6 +86,12 @@ def main():
                     help="upper y-limit for the residual axis. Default "
                          "0.125 (= 12.5%%) clips ~0.02%% of dots and "
                          "keeps the bulk of the distribution legible.")
+    ap.add_argument("--fontscale", type=float, default=1.0,
+                    help="multiplier on all render() font sizes.")
+    ap.add_argument("--width_per_col", type=float, default=None,
+                    help="figure inches per column (default: render()'s "
+                         "own default). Smaller values enlarge fonts "
+                         "relative to the page.")
     args = ap.parse_args()
     excl = {n.strip() for n in args.exclude_dirs.split(",") if n.strip()}
 
@@ -99,14 +105,14 @@ def main():
 
     target, layer, mo = args.target, args.layer, args.max_overlap
     cols = [
-        ("Model",               col_model(layer, max_overlap=mo)),
-        ("Perturbation layer",  col_perturb_layer(target, max_overlap=mo)),
-        ("Measurement layer",   col_measure_layer(target, layer, max_overlap=mo)),
-        ("Fit metric",          col_metric(target, layer, max_overlap=mo)),
-        ("Response threshold",  col_threshold_residual(target, layer, max_overlap=mo)),
-        ("Perturbation method", col_method(target, layer, max_overlap=mo)),
-        ("Anchor source",       col_anchor_source(target, layer, max_overlap=mo)),
-        ("Token position",      col_token_position(target, layer, max_overlap=mo)),
+        ("Model",           col_model(layer, max_overlap=mo)),
+        ("Perturb. layer",  col_perturb_layer(target, max_overlap=mo)),
+        ("Measure layer",   col_measure_layer(target, layer, max_overlap=mo)),
+        ("Fit metric",      col_metric(target, layer, max_overlap=mo)),
+        ("Threshold",       col_threshold_residual(target, layer, max_overlap=mo)),
+        ("Method",          col_method(target, layer, max_overlap=mo)),
+        ("Anchor source",   col_anchor_source(target, layer, max_overlap=mo)),
+        ("Token position",  col_token_position(target, layer, max_overlap=mo)),
     ]
     cols = [(label, _apply_filters(d, target, layer, mo, excl))
             for label, d in cols]
@@ -135,6 +141,13 @@ def main():
         for sub, ps in subs.items():
             print(f"  {label:18s} {sub:>18s}  n={len(ps)}")
 
+    # Clip statistics for the caption: how many plotted dots exceed y_max.
+    all_vals = np.array([v for _, subs in cols
+                         for ps in subs.values() for v in ps.values()])
+    n_clip = int((all_vals > args.y_max).sum())
+    print(f"dots: {len(all_vals)} total, {n_clip} above y_max="
+          f"{args.y_max:g} ({100*n_clip/len(all_vals):.3f}%)")
+
     out_png = os.path.join(
         OUT_DIR,
         f"residuals_beeswarm_{target}_L{layer}_ov0p1_thrpair_exact.png")
@@ -144,9 +157,11 @@ def main():
                  if args.ref_pct is not None else "")
     render(cols, out_png, out_pdf,
            show_sub_legends=True, show_stats_text=False,
-           ylabel="median superellipse fit residual",
+           ylabel="median superellipse\nfit residual",
            ref_y=ref_y, ref_label=ref_label,
-           ylim=(0.0, args.y_max))
+           ylim=(0.0, args.y_max), fontscale=args.fontscale,
+           width_per_col=args.width_per_col,
+           yticks=list(np.arange(0.0, args.y_max + 1e-9, 0.02)))
 
 
 if __name__ == "__main__":

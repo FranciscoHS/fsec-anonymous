@@ -596,7 +596,9 @@ def render(columns_data, png_path, pdf_path,
             ylim: tuple[float, float] | None = None,
             fontscale: float = 1.0,
             divider_before: set[str] | None = None,
-            col_colors: dict[str, str] | None = None):
+            col_colors: dict[str, str] | None = None,
+            width_per_col: float | None = None,
+            yticks: list[float] | None = None):
     """columns_data is a list of (column_label, sub_label_to_values_dict).
 
     Within each column, all sub-groups share the same x position; they're
@@ -625,8 +627,20 @@ def render(columns_data, png_path, pdf_path,
     # doesn't overflow into the next column. Also widened for plain
     # mode at the new larger fontsize so multi-word column labels (e.g.
     # "Perturbation method") don't collide with their neighbours.
-    width_per_col = 2.9 if show_stats_text else 2.2
-    fig, ax = plt.subplots(figsize=(width_per_col * n_cols + 1.6, 4.8))
+    if width_per_col is None:
+        width_per_col = 2.9 if show_stats_text else 2.2
+    # The per-column legends live in the bottom margin, so a column with
+    # more levels than the rest (e.g. Model, with six models) needs extra
+    # canvas or its last rows fall off the figure edge. Grow the height
+    # instead of the margin so the panel itself keeps its size.
+    LEGEND_ROW_IN = 0.285 * fontscale
+    BASE_LEGEND_ROWS = 5
+    n_legend_rows = max((sum(1 for s in subs if len(subs[s]))
+                         for _, subs in columns_data), default=0) \
+        if show_sub_legends else 0
+    extra_h = LEGEND_ROW_IN * max(0, n_legend_rows - BASE_LEGEND_ROWS)
+    fig_h = 4.8 + extra_h
+    fig, ax = plt.subplots(figsize=(width_per_col * n_cols + 1.6, fig_h))
     rng = np.random.RandomState(0)
 
     x_pos = 1.0
@@ -756,6 +770,8 @@ def render(columns_data, png_path, pdf_path,
     ax.tick_params(axis="y", labelsize=20 * fontscale)
     if ylim is not None:
         ax.set_ylim(*ylim)
+    if yticks is not None:
+        ax.set_yticks(yticks)
     ax.set_xlim(0.2, x_pos - 1.0 + 0.8)
     ax.set_xticks([])
     ax.spines["top"].set_visible(False)
@@ -769,7 +785,7 @@ def render(columns_data, png_path, pdf_path,
     # Reserve bottom margin for per-column color legends; if those are
     # off, the column labels alone need only a small margin.
     if show_sub_legends:
-        bottom = 0.48
+        bottom = 0.48 * fontscale
     elif show_stats_text:
         # room for family name + two-line CI block, scaled with fontsize
         bottom = 0.30 + 0.04 * fontscale
@@ -777,7 +793,12 @@ def render(columns_data, png_path, pdf_path,
         bottom = 0.10
     # top leaves room for the legend just above the axes; left for the
     # (two-line) y-label; bottom for the column labels/legends.
-    fig.subplots_adjust(left=0.075, right=0.995, top=0.88, bottom=bottom)
+    # `bottom`/top are tuned against the 4.8in baseline canvas; convert to
+    # fractions of the (possibly taller) figure so the panel stays put and
+    # the extra height all goes to the legend strip.
+    fig.subplots_adjust(left=0.075, right=0.995,
+                        top=1.0 - (0.12 * 4.8) / fig_h,
+                        bottom=(bottom * 4.8 + extra_h) / fig_h)
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
     # No bbox_inches="tight": it crops the per-column legends, which live
     # in the bottom margin via xaxis-transform anchors. Manual margins
